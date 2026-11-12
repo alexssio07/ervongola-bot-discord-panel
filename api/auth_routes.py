@@ -38,14 +38,19 @@ def login():
     return _token_response(username)
 
 
+@bp.get("/config")
+def public_config():
+    """Cosa puo' mostrare la pagina di login (nessun dato sensibile)."""
+    return jsonify({"registration_enabled": config.ALLOW_REGISTRATION})
+
+
 @bp.post("/register")
 def register():
-    """Registrazione volutamente aperta, senza codice d'invito — vedi
-    l'avviso di sicurezza in cima ad auth.py (si chiude con ALLOW_REGISTRATION=false). Risponde con lo stesso formato
-    del login e logga subito dopo la registrazione, così chi si registra
-    entra subito nel pannello senza dover rifare il login a mano."""
+    """Registrazione senza codice d'invito, disponibile solo fuori dalla produzione
+    (preview/test/locale; vedi config.ALLOW_REGISTRATION e l'avviso in auth.py). Risponde
+    con lo stesso formato del login: chi si registra entra subito nel pannello."""
     if not config.ALLOW_REGISTRATION:
-        return jsonify({"error": "La registrazione di nuovi utenti è disattivata."}), 403
+        return jsonify({"error": "La registrazione di nuovi utenti è disattivata in questo ambiente."}), 403
 
     payload = request.get_json(silent=True) or {}
     username = payload.get("username", "")

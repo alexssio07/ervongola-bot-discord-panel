@@ -24,7 +24,7 @@ New Project → stesso repo → **Root Directory = `api`**. Variabili d'ambiente
 | `SECRET_KEY` | stringa lunga casuale (**obbligatoria**: senza, l'app non parte su Vercel) |
 | `ADMIN_USERNAME`, `ADMIN_PASSWORD_HASH` | l'admin fisso (hash, non la password) |
 | `CORS_ALLOWED_ORIGINS` | URL del frontend, es. `https://tuo-pannello.vercel.app` |
-| `ALLOW_REGISTRATION` | **`false`** consigliato (default `true`: chiunque potrebbe registrarsi) |
+| `ALLOW_REGISTRATION` | facoltativa: in **produzione la registrazione è sempre chiusa** (solo login con l'admin sopra); nelle preview e in locale è aperta, `false` la chiude anche lì |
 | `BOT_SYNC_TOKEN` | stringa casuale; la stessa va nel bot (`PANEL_SYNC_TOKEN`) |
 | `TMDB_API_KEY` | per la ricerca film |
 | `DISCORD_TOKEN`, `MOVIES_FORUM_CHANNEL_ID` | solo se usi la sincronizzazione col forum: valuta se tenere il token del bot su Vercel |
@@ -59,6 +59,23 @@ python tools/bot_sync.py --json-dir json --audio-dir audio_files --interval 3600
 I contatori `users` di `frasieffetto.json` scritti dal bot **restano locali** e non vengono sovrascritti.
 Le modifiche del pannello arrivano al bot con il ritardo dell'intervallo. Gli audio tolti dal pannello non sono cancellati dal bot.
 Nel bot rimuovi le variabili `PANEL_LOG_*` (i log non passano più dal pannello). Il vecchio pannello sul Pi non legge più `panel.db`.
+
+## Backup e ripristino dei film dal pannello
+Nel pannello: **Film → Backup**.
+- **Scarica backup**: salva il catalogo in un file JSON sul tuo computer.
+- **Ripristina da file**: *Aggiungi i film mancanti* (consigliato; i già presenti sono saltati e gli elementi non validi segnalati) oppure *Sostituisci tutto*, che prima salva una copia di sicurezza del catalogo nello store (`data/backups/movies-<data>.json`, visibile da Vercel → Storage).
+- Per portare i film del **vecchio pannello** (`panel.db`): `python tools/db_to_backup.py --db percorso/panel.db`, poi caricare `film-backup.json` da "Ripristina da file".
+- Limite: file fino a 4 MB e 5.000 film per ripristino.
+
+## Backup dei dati su Git
+```
+python tools/export_from_blob.py            # film + frasi in backup/data e backup/json
+git add backup && git commit -m "Backup dati pannello" && git push
+```
+- Gli utenti (hash delle password) sono esclusi: `--include-users` solo se il repository è **privato**.
+- Gli mp3 sono esclusi: `--audio` li scarica in `backup/audio`; GitHub rifiuta file oltre 100 MB.
+- I file sono riscritti solo se cambiano, quindi i commit mostrano le modifiche vere.
+- Ripristino: `python tools/upload_to_blob.py --data-dir backup/data --json-dir backup/json --audio-dir backup/audio --force`
 
 ## Quota Hobby (Blob)
 1 GB di spazio, 10.000 operazioni semplici/mese, 2.000 avanzate (put/list), 10 GB di trasferimento; superarle blocca Blob per 30 giorni.

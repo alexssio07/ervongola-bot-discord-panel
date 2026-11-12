@@ -50,10 +50,15 @@ FRONTEND_DIST_DIR = Path(os.getenv("FRONTEND_DIST_DIR", str(_API_DIR.parent / "d
 # --- Autenticazione ---
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD_HASH = os.getenv("ADMIN_PASSWORD_HASH", "")
-# Registrazione di nuovi utenti dal form di login. Predefinito: aperta (scelta
-# originale del proprietario). Imposta ALLOW_REGISTRATION=false per chiuderla,
-# consigliato ora che il pannello e' raggiungibile da internet.
-ALLOW_REGISTRATION = _flag("ALLOW_REGISTRATION", True)
+# Ambiente Vercel: "production", "preview" o "development" (vuoto fuori da Vercel).
+VERCEL_ENV = os.getenv("VERCEL_ENV", "").strip().lower()
+IS_PRODUCTION = VERCEL_ENV == "production"
+
+# Registrazione di nuovi utenti dal form di login: in PRODUZIONE su Vercel e' sempre
+# chiusa (solo login, con l'admin delle variabili d'ambiente), qualunque sia
+# ALLOW_REGISTRATION; in preview, in sviluppo e in locale resta aperta per le prove
+# (ALLOW_REGISTRATION=false la chiude anche li').
+ALLOW_REGISTRATION = (not IS_PRODUCTION) and _flag("ALLOW_REGISTRATION", True)
 
 # --- Token di sessione (itsdangerous, incluso in Flask) ---
 SECRET_KEY = os.getenv("SECRET_KEY", "CHANGE-ME-please-set-a-real-secret-in-.env")

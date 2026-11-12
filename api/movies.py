@@ -1,6 +1,9 @@
 """Blueprint CRUD per il catalogo film, con filtri per tag/piattaforma/genere/ricerca."""
 
-from flask import Blueprint, g, jsonify, request
+import json
+from datetime import date
+
+from flask import Blueprint, Response, g, jsonify, request
 
 import activity
 import db
@@ -9,6 +12,7 @@ from auth import require_auth
 bp = Blueprint("movies", __name__, url_prefix="/api/movies")
 
 REQUIRED_FIELDS = ("title",)
+MAX_RESTORE_BYTES = 4 * 1024 * 1024  # sotto il limite di 4,5 MB del corpo di una richiesta su Vercel
 
 
 @bp.get("")
@@ -56,6 +60,50 @@ def check_duplicates():
         request.args.get("title", ""), request.args.get("release_year", ""), exclude_id=exclude
     )
     return jsonify({"duplicates": found})
+
+
+@bp.get("/backup")
+@require_auth
+def download_backup():
+    """Scarica l'intero catalogo come file JSON (ripristinabile con POST /restore)."""
+    body = json.dumps(db.export_backup(), ensure_ascii=False, indent=2)
+    filename = f"ervongola-film-backup-{date.today().isoformat()}.json"
+    return Response(
+        body,
+        mimetype="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@bp.post("/restore")
+@require_auth
+def restore_backup():
+    """Importa un file di backup. Campo `file` (multipart) e `mode`: merge (predefinito,
+    aggiunge i film mancanti e salta i doppioni) oppure replace (sostituisce il catalogo,
+    salvando prima una copia di sicurezza)."""
+    upload = request.files.get("file")
+    if upload is None:
+        return jsonify({"error": "Nessun file ricevuto."}), 400
+    raw = upload.read(MAX_RESTORE_BYTES + 1)
+    if len(raw) > MAX_RESTORE_BYTES:
+        return jsonify({"error": "File troppo grande (massimo 4 MB)."}), 413
+    try:
+        document = json.loads(raw.decode("utf-8-sig"))
+    except (UnicodeDecodeError, ValueError):
+        return jsonify({"error": "Il file non e' un JSON valido."}), 400
+
+    # Accetta sia il backup del pannello ({"movies": [...]}) sia una lista nuda di film.
+    items = document.get("movies") if isinstance(document, dict) else document
+    mode = request.form.get("mode") or "merge"
+    try:
+        result = db.import_movies(items, mode, importer=g.current_user)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    if result["added"] or mode == "replace":
+        action = "update" if mode == "replace" else "add"
+        activity.publish(g.current_user, action, "movies", f"{result['added']} film da backup")
+    return jsonify(result)
 
 
 @bp.get("/<int:movie_id>")

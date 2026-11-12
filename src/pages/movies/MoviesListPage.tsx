@@ -1,4 +1,5 @@
 import AddIcon from "@mui/icons-material/Add";
+import BackupIcon from "@mui/icons-material/Backup";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import LayersIcon from "@mui/icons-material/Layers";
@@ -45,6 +46,7 @@ import {
   type MovieStatus,
 } from "../../api/movies";
 import ActivityLayout from "../../components/ActivityFeed";
+import BackupDialog from "../../components/BackupDialog";
 import ForumReportDialog from "../../components/ForumReportDialog";
 import MovieStatsPanel from "../../components/MovieStats";
 import MovieDialog, { STATUS_META, formatWatchedDate } from "../../components/MovieDialog";
@@ -114,6 +116,7 @@ export default function MoviesListPage() {
   const [groupingNote, setGroupingNote] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [forumReport, setForumReport] = useState<ForumReport | null>(null);
+  const [backupOpen, setBackupOpen] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setSearch(searchInput.trim()), SEARCH_DEBOUNCE_MS);
@@ -385,7 +388,7 @@ export default function MoviesListPage() {
         <Typography variant="h5" component="h1">
           FILM VISTI SU DISCORD
         </Typography>
-        <Stack direction="row" spacing={2}>
+        <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
           <Button
             variant="contained"
             startIcon={<AddIcon />}
@@ -409,6 +412,9 @@ export default function MoviesListPage() {
             disabled={syncing || loading}
           >
             Sincronizza forum (solo report)
+          </Button>
+          <Button variant="outlined" startIcon={<BackupIcon />} onClick={() => setBackupOpen(true)}>
+            Backup
           </Button>
           <Button
             variant="outlined"
@@ -597,6 +603,7 @@ export default function MoviesListPage() {
 
       <MovieDialog movie={selectedMovie} onClose={() => setSelectedMovie(null)} />
       <ForumReportDialog report={forumReport} onClose={() => setForumReport(null)} />
+      <BackupDialog open={backupOpen} onClose={() => setBackupOpen(false)} onRestored={() => reload(true)} />
     </ActivityLayout>
   );
 }

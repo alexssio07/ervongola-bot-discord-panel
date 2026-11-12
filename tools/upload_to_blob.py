@@ -3,6 +3,7 @@
 Carica nello archivio del pannello (Vercel Blob) i dati che oggi stanno sul Pi / sul PC:
 
   --db PATH         film e utenti dal vecchio database SQLite (api/data/panel.db)
+  --data-dir DIR    movies.json e users.json gia' nel formato del pannello (da tools/export_from_blob.py)
   --json-dir DIR    frasiaddio.json, frasieffetto.json, blasfemia.json (cartella json/ del bot)
   --audio-dir DIR   i file .mp3/.wav (cartella audio_files/ del bot), di qualsiasi dimensione
 
@@ -72,6 +73,21 @@ def plan_db(path: Path, force: bool, actions: list):
     con.close()
 
 
+def plan_data(directory: Path, force: bool, actions: list):
+    for doc in (db.MOVIES_DOC, db.USERS_DOC):
+        path = directory / Path(doc).name
+        if not path.is_file():
+            print(f"  (salto) {path} non esiste")
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as e:
+            sys.exit(f"{path}: JSON non valido ({e})")
+        if not isinstance(data, dict) or "next_id" not in data:
+            sys.exit(f"{path}: non e' un documento del pannello (manca next_id)")
+        actions.append((doc, "documento del pannello", lambda n=doc, d=data: storage.write_json(n, d), force))
+
+
 def plan_json(directory: Path, force: bool, actions: list):
     for key, spec in phrases_store.FILE_REGISTRY.items():
         path = directory / spec.filename
@@ -110,13 +126,14 @@ def plan_audio(directory: Path, force: bool, actions: list):
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--db", type=Path, help="percorso di panel.db (SQLite)")
+    parser.add_argument("--data-dir", type=Path, help="cartella con movies.json / users.json del pannello")
     parser.add_argument("--json-dir", type=Path, help="cartella con i json delle frasi")
     parser.add_argument("--audio-dir", type=Path, help="cartella con gli audio")
     parser.add_argument("--force", action="store_true", help="sovrascrive i documenti gia' presenti nello archivio")
     parser.add_argument("--dry-run", action="store_true", help="mostra solo cosa farebbe")
     args = parser.parse_args()
-    if not (args.db or args.json_dir or args.audio_dir):
-        parser.error("indica almeno uno fra --db, --json-dir, --audio-dir")
+    if not (args.db or args.data_dir or args.json_dir or args.audio_dir):
+        parser.error("indica almeno uno fra --db, --data-dir, --json-dir, --audio-dir")
 
     if config.STORAGE_BACKEND == "blob" and not (os.getenv("BLOB_READ_WRITE_TOKEN") or os.getenv("VERCEL_OIDC_TOKEN")):
         sys.exit("Imposta BLOB_READ_WRITE_TOKEN (Vercel > Storage > il tuo Blob store > .env.local) oppure usa STORAGE_BACKEND=local.")
@@ -125,6 +142,8 @@ def main() -> int:
     actions: list = []  # (nome, descrizione, funzione, sovrascrivi?)
     if args.db:
         plan_db(args.db, args.force, actions)
+    if args.data_dir:
+        plan_data(args.data_dir, args.force, actions)
     if args.json_dir:
         plan_json(args.json_dir, args.force, actions)
     if args.audio_dir:

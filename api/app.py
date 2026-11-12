@@ -62,7 +62,11 @@ def _startup_checks() -> None:
     if insecure_secret:
         logger.warning("SECRET_KEY è ancora al valore di default: impostala prima di esporre il pannello.")
     if config.ON_VERCEL and config.ALLOW_REGISTRATION:
-        logger.warning("Registrazione aperta a chiunque su un deploy pubblico (ALLOW_REGISTRATION=false per chiuderla).")
+        logger.warning(
+            "Registrazione aperta a chiunque in questo deploy (%s): in produzione e' sempre chiusa; "
+            "ALLOW_REGISTRATION=false la chiude anche qui.",
+            config.VERCEL_ENV or "ambiente non production",
+        )
 
 
 _startup_checks()

@@ -36,9 +36,11 @@ più uno store Blob privato. Passi completi, variabili d'ambiente e quota gratui
 |---|---|
 | `blob_selftest.py` | verifica lo store Blob reale prima di pubblicare |
 | `upload_to_blob.py` | carica `panel.db`, json delle frasi e mp3 nello store |
+| `db_to_backup.py` | converte il vecchio `panel.db` nel file da caricare con "Film > Backup > Ripristina da file" |
+| `export_from_blob.py` | scarica da Blob film, frasi (e a richiesta audio) in `backup/` da committare su Git |
 | `bot_sync.py` | sul bot: scarica frasi e audio modificati dal pannello |
 
 ## Sicurezza
 
 Non committare mai `.env`, `api/.env` o `api/data/` (sono nel `.gitignore`): contengono `SECRET_KEY`,
-l'hash della password admin e i dati del pannello. Imposta `ALLOW_REGISTRATION=false` in produzione.
+l'hash della password admin e i dati del pannello. In produzione su Vercel la registrazione è sempre chiusa (solo login); è aperta solo in preview e in locale.

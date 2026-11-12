@@ -354,6 +354,152 @@ def delete_movie(movie_id: int) -> bool:
     return storage.update_json(MOVIES_DOC, _empty_movies, _delete)
 
 
+# --- backup e ripristino da file ---
+BACKUP_FORMAT = "ervongola-movies-backup"
+MAX_IMPORT_ITEMS = 5000  # il corpo di una richiesta su Vercel e' comunque limitato a 4,5 MB
+_REPORT_LIMIT = 20  # quanti titoli/errori elencare nel risultato
+
+
+def export_backup() -> dict:
+    """Tutto il catalogo in un documento autosufficiente, da salvare come file."""
+    movies = sorted(_load_movies(), key=lambda m: m["id"])
+    return {
+        "format": BACKUP_FORMAT,
+        "version": 1,
+        "exported_at": _now(),
+        "count": len(movies),
+        "movies": movies,
+    }
+
+
+def _clean_text(value) -> str:
+    return "" if value is None else str(value).strip()
+
+
+def _backup_row(item, fallback_user: str, now: str) -> dict:
+    """Un film del file -> campi validati (stesse regole di create_movie).
+    Solleva ValueError con un motivo leggibile se non e' importabile."""
+    if not isinstance(item, dict):
+        raise ValueError("elemento non valido (non e' un film).")
+    title = _clean_text(item.get("title"))
+    if not title:
+        raise ValueError("titolo mancante.")
+    status = _clean_text(item.get("status")) or "da_guardare"
+    if status not in VALID_STATUSES:
+        raise ValueError(f"stato non valido: {status}")
+    created_at = _clean_text(item.get("created_at")) or now
+    return {
+        "title": title,
+        "link": _clean_text(item.get("link")),
+        "platform": _clean_text(item.get("platform")),
+        "status": status,
+        "cover_url": _clean_text(item.get("cover_url")),
+        "genre": _clean_text(item.get("genre")),
+        "notes": _clean_text(item.get("notes")),
+        "watched_at": _validate_watched_at(_clean_text(item.get("watched_at"))),
+        "added_by": _clean_text(item.get("added_by")) or fallback_user,
+        "proposed_by": _clean_text(item.get("proposed_by")),
+        "collection": _clean_text(item.get("collection")),
+        "release_year": _validate_year(item.get("release_year")),
+        "runtime": _validate_runtime(item.get("runtime")),
+        "created_at": created_at,
+        "updated_at": _clean_text(item.get("updated_at")) or created_at,
+    }
+
+
+def import_movies(items, mode: str = "merge", importer: str = "") -> dict:
+    """Importa i film di un backup.
+
+    mode="merge":   aggiunge i film mancanti con nuovi id; quelli gia' presenti
+                    (stesso titolo e anno compatibile, come in find_duplicates) sono saltati.
+    mode="replace": sostituisce l'intero catalogo con il contenuto del file, mantenendo
+                    gli id del file quando validi; prima salva una copia di sicurezza del
+                    catalogo attuale (data/backups/movies-<data>.json).
+
+    Un file senza nessun film valido viene rifiutato in entrambi i modi (non svuota nulla).
+    Complessita': O(n + m) con un indice dei titoli normalizzati."""
+    if mode not in ("merge", "replace"):
+        raise ValueError("Modalita' non valida (merge o replace).")
+    if not isinstance(items, list):
+        raise ValueError("Il file non contiene una lista di film.")
+    if len(items) > MAX_IMPORT_ITEMS:
+        raise ValueError(f"Troppi film nel file (massimo {MAX_IMPORT_ITEMS}).")
+
+    now = _now()
+    accepted: list[tuple[int | None, dict]] = []
+    invalid: list[dict] = []
+    for index, item in enumerate(items, start=1):
+        try:
+            row = _backup_row(item, importer, now)
+        except ValueError as e:
+            title = _clean_text(item.get("title")) if isinstance(item, dict) else ""
+            invalid.append({"index": index, "title": title, "error": str(e)})
+            continue
+        raw_id = item.get("id")
+        accepted.append((raw_id if isinstance(raw_id, int) and not isinstance(raw_id, bool) and raw_id > 0 else None, row))
+    if not accepted:
+        raise ValueError("Nessun film valido nel file: il catalogo non e' stato modificato.")
+
+    def _apply(doc: dict) -> dict:
+        safety_copy = ""
+        if mode == "replace":
+            safety_copy = f"data/backups/movies-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}.json"
+            storage.write_json(safety_copy, doc)  # se fallisce, il catalogo non viene toccato
+            existing: list[dict] = []
+        else:
+            existing = list(doc["movies"])
+
+        seen: dict[str, list[str]] = {}
+        if mode == "merge":
+            for movie in existing:
+                seen.setdefault(_normalize_title(movie["title"]), []).append(str(movie.get("release_year") or ""))
+
+        kept: list[tuple[int | None, dict]] = []
+        skipped: list[str] = []
+        used_ids: set[int] = set()
+        for raw_id, row in accepted:
+            if mode == "merge":
+                key = _normalize_title(row["title"])
+                years = seen.get(key)
+                if years is not None and any(not row["release_year"] or not y or y == row["release_year"] for y in years):
+                    skipped.append(row["title"])
+                    continue
+                seen.setdefault(key, []).append(row["release_year"])
+                raw_id = None  # nuovi id: quelli del file potrebbero essere gia' presi
+            elif raw_id in used_ids:
+                raw_id = None  # id ripetuto nel file: ne assegna uno nuovo
+            if raw_id is not None:
+                used_ids.add(raw_id)
+            kept.append((raw_id, row))
+
+        if mode == "merge" and not kept:
+            raise storage.SkipWrite(
+                {"mode": mode, "added": 0, "skipped_duplicates": len(skipped), "skipped_titles": skipped[:_REPORT_LIMIT],
+                 "invalid_count": len(invalid), "invalid": invalid[:_REPORT_LIMIT], "total": len(existing), "safety_copy": ""}
+            )
+
+        counter = max([doc["next_id"], *(i + 1 for i in used_ids)])  # gli id non vengono mai riutilizzati
+        for raw_id, row in kept:
+            movie_id = raw_id if raw_id is not None else counter
+            if raw_id is None:
+                counter += 1
+            existing.append(_normalize_row({"id": movie_id, **row}))
+        doc["movies"] = existing
+        doc["next_id"] = counter
+        return {
+            "mode": mode,
+            "added": len(kept),
+            "skipped_duplicates": len(skipped),
+            "skipped_titles": skipped[:_REPORT_LIMIT],
+            "invalid_count": len(invalid),
+            "invalid": invalid[:_REPORT_LIMIT],
+            "total": len(existing),
+            "safety_copy": safety_copy,
+        }
+
+    return storage.update_json(MOVIES_DOC, _empty_movies, _apply)
+
+
 # --- utenti ---
 def get_user_by_username(username: str) -> dict | None:
     # Letto con una cache piu' lunga: serve a ogni richiesta autenticata di un

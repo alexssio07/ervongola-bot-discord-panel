@@ -259,3 +259,42 @@ export async function getMovieProviders(movieId: number): Promise<MovieProviders
   const res = await apiClient.get<MovieProviders>(`/api/movies/${movieId}/providers`);
   return res.data;
 }
+
+export type RestoreMode = "merge" | "replace";
+
+export interface RestoreResult {
+  mode: RestoreMode;
+  added: number;
+  skipped_duplicates: number;
+  /** Primi titoli saltati perché già presenti */
+  skipped_titles: string[];
+  invalid_count: number;
+  /** Primi elementi del file non importabili, col motivo */
+  invalid: { index: number; title: string; error: string }[];
+  /** Film nel catalogo dopo l'operazione */
+  total: number;
+  /** Solo in modalità "replace": dove è stata salvata la copia del catalogo precedente */
+  safety_copy: string;
+}
+
+/** Scarica l'intero catalogo come file JSON (ripristinabile con restoreMoviesBackup). */
+export async function downloadMoviesBackup(): Promise<void> {
+  const res = await apiClient.get<Blob>("/api/movies/backup", { responseType: "blob" });
+  const url = URL.createObjectURL(res.data);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `ervongola-film-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+/** Importa un file di backup: "merge" aggiunge i film mancanti, "replace" sostituisce il catalogo. */
+export async function restoreMoviesBackup(file: File, mode: RestoreMode): Promise<RestoreResult> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("mode", mode);
+  const res = await apiClient.post<RestoreResult>("/api/movies/restore", form);
+  return res.data;
+}
