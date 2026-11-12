@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 
 from flask import Flask
 from flask_cors import CORS
@@ -25,7 +26,14 @@ logging.basicConfig(
 logger = logging.getLogger("panel")
 
 app = Flask(__name__)
-CORS(app, origins=config.CORS_ALLOWED_ORIGINS, supports_credentials=True)
+_cors_origins: list = list(config.CORS_ALLOWED_ORIGINS)
+if config.CORS_ALLOWED_ORIGIN_REGEX:
+    try:
+        # \Z: l'espressione deve coprire tutto l'indirizzo (senza, "https://x.vercel.app.evil.com" passerebbe)
+        _cors_origins.append(re.compile(f"(?:{config.CORS_ALLOWED_ORIGIN_REGEX})\\Z"))
+    except re.error as e:
+        logger.warning("CORS_ALLOWED_ORIGIN_REGEX non valida, ignorata: %s", e)
+CORS(app, origins=_cors_origins, supports_credentials=True)
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(movies_bp)

@@ -70,6 +70,10 @@ TOKEN_MAX_AGE_SECONDS = int(os.getenv("TOKEN_MAX_AGE_MINUTES", "720")) * 60  # 1
 CORS_ALLOWED_ORIGINS = [
     o.strip() for o in os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(",") if o.strip()
 ]
+# Facoltativo: espressione regolare per gli indirizzi che cambiano a ogni deploy (le preview
+# di Vercel). Deve corrispondere all'INTERO indirizzo (viene ancorata in fondo), quindi limitala
+# al tuo team, ad es.  https://ervongola-dashboard-[a-z0-9-]+-alexssio07s-projects\.vercel\.app
+CORS_ALLOWED_ORIGIN_REGEX = os.getenv("CORS_ALLOWED_ORIGIN_REGEX", "").strip()
 
 # --- Ricerca automatica del genere film (TMDB, https://www.themoviedb.org) ---
 # Accetta sia la "API Key (v3)" sia il "Read Access Token (v4)" (inizia con "eyJ").
