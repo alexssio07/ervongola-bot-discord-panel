@@ -1,0 +1,8 @@
+# Non caricare su Vercel: segreti, dati locali, backup e cache.
+.env
+.env.*
+data/
+__pycache__/
+*.pyc
+*.bak
+*.bak[0-9]*

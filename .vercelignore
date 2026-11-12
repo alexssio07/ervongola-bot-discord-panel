@@ -1,0 +1,8 @@
+# Il frontend e il backend sono due progetti Vercel separati: dal progetto
+# frontend (root = questa cartella) si escludono backend, strumenti e scarti.
+api
+tools
+_to_delete
+node_modules
+dist
+*.bak*

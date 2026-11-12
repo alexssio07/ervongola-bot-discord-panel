@@ -1,0 +1,11 @@
+flask
+flask-cors
+python-dotenv
+requests
+
+# Archivio dati su Vercel Blob (usato solo con STORAGE_BACKEND=blob, cioe' su Vercel).
+vercel-blob>=0.5.0
+
+# Server WSGI per l'esecuzione fuori da Vercel (container/server tuo): il server
+# di sviluppo integrato di Flask non va usato in produzione. Su Vercel e' ignorato.
+gunicorn
