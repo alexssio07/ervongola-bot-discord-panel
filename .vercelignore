@@ -1,8 +1,12 @@
 # Il frontend e il backend sono due progetti Vercel separati: dal progetto
-# frontend (root = questa cartella) si escludono backend, strumenti e scarti.
+# frontend (root = questa cartella) si escludono backend, strumenti, segreti e scarti.
+# NON aggiungere dist o node_modules: Vercel escluderebbe anche l'output del build
+# (errore STATIC_BUILD_NO_OUT_DIR).
 api
 tools
 _to_delete
-node_modules
-dist
-*.bak*
+.env
+.env.*
+!.env.example
+*.bak
+*.bak[0-9]*
