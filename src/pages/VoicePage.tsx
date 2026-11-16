@@ -27,6 +27,7 @@ import {
 } from "@mui/material";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiErrorMessage } from "../api/client";
+import { useAuth } from "../context/AuthContext";
 import {
   connectVoice,
   disconnectVoice,
@@ -59,6 +60,9 @@ function savedChannel(): string {
 }
 
 export default function VoicePage() {
+  // Solo l'interfaccia: il backend controlla comunque il permesso su ogni richiesta.
+  const { can } = useAuth();
+  const canControl = can("audio", "write");
   const [files, setFiles] = useState<AudioFile[] | null>(null);
   const [channels, setChannels] = useState<VoiceChannel[]>([]);
   const [channelId, setChannelId] = useState<string>(savedChannel());
@@ -199,9 +203,15 @@ export default function VoicePage() {
         Audio
       </Typography>
 
+      {!canControl && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Hai accesso in sola lettura: puoi ascoltare le anteprime ma non controllare il bot.
+        </Alert>
+      )}
+
       <Paper sx={{ p: 2, mb: 3 }}>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ sm: "center" }}>
-          <FormControl size="small" sx={{ minWidth: 240, flexGrow: 1 }} disabled={connected || busy !== null}>
+          <FormControl size="small" sx={{ minWidth: 240, flexGrow: 1 }} disabled={connected || busy !== null || !canControl}>
             <InputLabel id="voice-channel-label">Canale vocale</InputLabel>
             <Select
               labelId="voice-channel-label"
@@ -231,7 +241,7 @@ export default function VoicePage() {
               variant="outlined"
               color="error"
               startIcon={busy === "disconnect" ? <CircularProgress size={18} /> : <LinkOffIcon />}
-              disabled={busy !== null}
+              disabled={busy !== null || !canControl}
               onClick={() => void run(disconnectVoice, "disconnect")}
             >
               Disconnetti
@@ -240,7 +250,7 @@ export default function VoicePage() {
             <Button
               variant="contained"
               startIcon={busy === "connect" ? <CircularProgress size={18} color="inherit" /> : <HeadsetMicIcon />}
-              disabled={!channelId || busy !== null || botDown}
+              disabled={!channelId || busy !== null || botDown || !canControl}
               onClick={() => void run(() => connectVoice(channelId), "connect")}
             >
               Connetti
@@ -250,7 +260,7 @@ export default function VoicePage() {
           <Button
             variant="outlined"
             startIcon={<StopIcon />}
-            disabled={!status?.playing}
+            disabled={!status?.playing || !canControl}
             onClick={() => void run(stopAudio)}
           >
             Stop
@@ -339,7 +349,7 @@ export default function VoicePage() {
                 >
                   <ListItemButton
                     selected={!!isPlaying}
-                    disabled={!connected}
+                    disabled={!connected || !canControl}
                     onClick={() => void run(() => playAudio(file.name))}
                     sx={{ pr: 15 }}
                   >

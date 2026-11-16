@@ -1,9 +1,9 @@
 import logging
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, g, jsonify, request
 
 import config
-from auth import create_token, register_user, verify_credentials
+from auth import create_token, get_permissions, is_admin, register_user, require_auth, verify_credentials
 
 bp = Blueprint("auth_routes", __name__, url_prefix="/api/auth")
 logger = logging.getLogger("panel.auth")
@@ -44,13 +44,27 @@ def public_config():
     return jsonify({"registration_enabled": config.ALLOW_REGISTRATION})
 
 
+@bp.get("/me")
+@require_auth
+def me():
+    """Chi sono e cosa posso fare (il frontend lo usa per mostrare/nascondere le azioni;
+    il vero controllo resta sulle singole route)."""
+    return jsonify(
+        {
+            "username": g.current_user,
+            "is_admin": is_admin(g.current_user),
+            "permissions": get_permissions(g.current_user, fresh=True),
+        }
+    )
+
+
 @bp.post("/register")
 def register():
-    """Registrazione senza codice d'invito, disponibile solo fuori dalla produzione
-    (preview/test/locale; vedi config.ALLOW_REGISTRATION e l'avviso in auth.py). Risponde
-    con lo stesso formato del login: chi si registra entra subito nel pannello."""
+    """Registrazione senza codice d'invito. Chi si registra entra subito nel pannello, ma in
+    sola lettura finche' l'admin non gli assegna altri permessi (vedi auth.py). Risponde con
+    lo stesso formato del login. ALLOW_REGISTRATION=false la chiude."""
     if not config.ALLOW_REGISTRATION:
-        return jsonify({"error": "La registrazione di nuovi utenti è disattivata in questo ambiente."}), 403
+        return jsonify({"error": "La registrazione di nuovi utenti è temporaneamente disattivata."}), 403
 
     payload = request.get_json(silent=True) or {}
     username = payload.get("username", "")

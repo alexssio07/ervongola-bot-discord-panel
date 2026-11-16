@@ -2,20 +2,20 @@ from flask import Blueprint, g, jsonify, request
 
 import activity
 import phrases_store as store
-from auth import require_auth
+from auth import require_permission
 
 bp = Blueprint("phrases", __name__, url_prefix="/api/phrases")
 
 
 @bp.get("/files")
-@require_auth
+@require_permission("phrases", "read")
 def get_files():
     """Elenco dei file JSON gestibili, per popolare i tab del menu 'Modifica frasi'."""
     return jsonify(store.list_files())
 
 
 @bp.get("/<file_key>/similar")
-@require_auth
+@require_permission("phrases", "read")
 def get_similar(file_key: str):
     """Frasi già presenti molto simili a quella che si sta scrivendo (avviso live del form)."""
     try:
@@ -26,7 +26,7 @@ def get_similar(file_key: str):
 
 
 @bp.get("/<file_key>")
-@require_auth
+@require_permission("phrases", "read")
 def get_phrases(file_key: str):
     search = request.args.get("search")
     page = max(int(request.args.get("page", 1)), 1)
@@ -41,7 +41,7 @@ def get_phrases(file_key: str):
 
 
 @bp.post("/<file_key>")
-@require_auth
+@require_permission("phrases", "write")
 def add_phrase(file_key: str):
     payload = request.get_json(silent=True) or {}
     text = payload.get("text", "")
@@ -56,7 +56,7 @@ def add_phrase(file_key: str):
 
 
 @bp.put("/<file_key>/<int:index>")
-@require_auth
+@require_permission("phrases", "write")
 def update_phrase(file_key: str, index: int):
     payload = request.get_json(silent=True) or {}
     text = payload.get("text", "")
@@ -72,7 +72,7 @@ def update_phrase(file_key: str, index: int):
 
 
 @bp.delete("/<file_key>/<int:index>")
-@require_auth
+@require_permission("phrases", "write")
 def delete_phrase(file_key: str, index: int):
     expected = request.args.get("expected")
 

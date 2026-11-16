@@ -3,6 +3,7 @@ import ContrastIcon from "@mui/icons-material/Contrast";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import LogoutIcon from "@mui/icons-material/Logout";
+import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 import MovieIcon from "@mui/icons-material/Movie";
 import QueueMusicIcon from "@mui/icons-material/QueueMusic";
 import TextIncreaseIcon from "@mui/icons-material/TextIncrease";
@@ -25,6 +26,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ThemeSettingsProvider, useThemeSettings } from "./context/ThemeSettingsContext";
+import AdminPage from "./pages/AdminPage";
 import LoginPage from "./pages/LoginPage";
 import MovieFormPage from "./pages/movies/MovieFormPage";
 import MoviesListPage from "./pages/movies/MoviesListPage";
@@ -33,7 +35,7 @@ import VoicePage from "./pages/VoicePage";
 import type { FontSize } from "./theme";
 
 function TopBar() {
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, logout, can, isAdmin, username } = useAuth();
   const { settings, setMode, setPalette, setHighContrast, setFontSize } = useThemeSettings();
 
   return (
@@ -45,15 +47,26 @@ function TopBar() {
 
         {isAuthenticated && (
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-            <Button color="inherit" component={RouterLink} to="/movies" startIcon={<MovieIcon />}>
-              Film
-            </Button>
-            <Button color="inherit" component={RouterLink} to="/phrases" startIcon={<ChatIcon />}>
-              Frasi
-            </Button>
-            <Button color="inherit" component={RouterLink} to="/audio" startIcon={<QueueMusicIcon />}>
-              Audio
-            </Button>
+            {can("movies") && (
+              <Button color="inherit" component={RouterLink} to="/movies" startIcon={<MovieIcon />}>
+                Film
+              </Button>
+            )}
+            {can("phrases") && (
+              <Button color="inherit" component={RouterLink} to="/phrases" startIcon={<ChatIcon />}>
+                Frasi
+              </Button>
+            )}
+            {can("audio") && (
+              <Button color="inherit" component={RouterLink} to="/audio" startIcon={<QueueMusicIcon />}>
+                Audio
+              </Button>
+            )}
+            {isAdmin && (
+              <Button color="inherit" component={RouterLink} to="/admin" startIcon={<ManageAccountsIcon />}>
+                Utenti
+              </Button>
+            )}
 
             <Tooltip title={settings.mode === "dark" ? "Passa al tema chiaro" : "Passa al tema scuro"}>
               <IconButton
@@ -100,7 +113,7 @@ function TopBar() {
               </Select>
             </Tooltip>
 
-            <Tooltip title="Esci">
+            <Tooltip title={username ? `Esci (${username})` : "Esci"}>
               <IconButton color="inherit" onClick={logout}>
                 <LogoutIcon />
               </IconButton>
@@ -112,6 +125,13 @@ function TopBar() {
   );
 }
 
+/** Porta alla prima sezione che l'utente puo' vedere (nessuna sezione: /movies mostra il messaggio di accesso negato). */
+function HomeRedirect() {
+  const { can } = useAuth();
+  const target = can("movies") ? "/movies" : can("phrases") ? "/phrases" : can("audio") ? "/audio" : "/movies";
+  return <Navigate to={target} replace />;
+}
+
 function AppRoutes() {
   const { pathname } = useLocation();
   return (
@@ -121,7 +141,7 @@ function AppRoutes() {
         <Route
           path="/movies"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute area="movies">
               <MoviesListPage />
             </ProtectedRoute>
           }
@@ -129,7 +149,7 @@ function AppRoutes() {
         <Route
           path="/movies/:id"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute area="movies" level="write">
               <MovieFormPage />
             </ProtectedRoute>
           }
@@ -137,7 +157,7 @@ function AppRoutes() {
         <Route
           path="/phrases"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute area="phrases">
               <PhrasesPage />
             </ProtectedRoute>
           }
@@ -145,13 +165,21 @@ function AppRoutes() {
         <Route
           path="/audio"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute area="audio">
               <VoicePage />
             </ProtectedRoute>
           }
         />
-        <Route path="/" element={<Navigate to="/movies" replace />} />
-        <Route path="*" element={<Navigate to="/movies" replace />} />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute adminOnly>
+              <AdminPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/" element={<HomeRedirect />} />
+        <Route path="*" element={<HomeRedirect />} />
       </Routes>
     </ErrorBoundary>
   );

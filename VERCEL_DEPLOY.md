@@ -25,7 +25,7 @@ New Project → stesso repo → **Root Directory = `api`**. Variabili d'ambiente
 | `ADMIN_USERNAME`, `ADMIN_PASSWORD_HASH` | l'admin fisso (hash, non la password) |
 | `CORS_ALLOWED_ORIGINS` | URL del frontend, es. `https://tuo-pannello.vercel.app` |
 | `CORS_ALLOWED_ORIGIN_REGEX` | facoltativa, per le **preview** (indirizzo diverso a ogni deploy): `https://ervongola-dashboard-[a-z0-9-]+-alexssio07s-projects\.vercel\.app` (copre sia `-git-<branch>-` sia gli indirizzi con hash; deve combaciare con tutto l'indirizzo) |
-| `ALLOW_REGISTRATION` | facoltativa: in **produzione la registrazione è sempre chiusa** (solo login con l'admin sopra); nelle preview e in locale è aperta, `false` la chiude anche lì |
+| `ALLOW_REGISTRATION` | facoltativa: la registrazione è aperta ovunque (i nuovi utenti partono in sola lettura, i permessi si gestiscono da «Utenti» come admin); `false` la chiude |
 | `BOT_SYNC_TOKEN` | stringa casuale; la stessa va nel bot (`PANEL_SYNC_TOKEN`) |
 | `TMDB_API_KEY` | per la ricerca film |
 | `DISCORD_TOKEN`, `MOVIES_FORUM_CHANNEL_ID` | solo se usi la sincronizzazione col forum: valuta se tenere il token del bot su Vercel |

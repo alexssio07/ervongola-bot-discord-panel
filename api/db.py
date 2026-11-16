@@ -7,7 +7,7 @@ SQLite, quindi movies.py, movie_lookup.py, forum_sync.py e auth.py non cambiano.
 
 Documenti:
   data/movies.json  {"next_id": N, "movies": [ {id, title, link, ...}, ... ]}
-  data/users.json   {"next_id": N, "users":  [ {id, username, password_hash, created_at} ]}
+  data/users.json   {"next_id": N, "users":  [ {id, username, password_hash, created_at, permissions?} ]}
 
 Le query SQL (filtri, ordinamenti, statistiche) sono ora scritte in Python sulla
 lista dei film: a qualche migliaio di righe e' istantaneo. Complessita': tutte le
@@ -501,10 +501,15 @@ def import_movies(items, mode: str = "merge", importer: str = "") -> dict:
 
 
 # --- utenti ---
-def get_user_by_username(username: str) -> dict | None:
+def get_user_by_username(username: str, fresh: bool = False) -> dict | None:
     # Letto con una cache piu' lunga: serve a ogni richiesta autenticata di un
     # utente registrato (vedi auth.py), e un utente nuovo e' visibile entro USERS_CACHE_TTL.
-    doc = storage.read_json(USERS_DOC, _empty_users, max_age=config.USERS_CACHE_TTL)
+    # fresh=True salta la cache: lo usano i controlli di scrittura, cosi' una revoca
+    # di permessi vale subito anche su un'altra istanza.
+    if fresh:
+        doc = storage.read_json(USERS_DOC, _empty_users, fresh=True)
+    else:
+        doc = storage.read_json(USERS_DOC, _empty_users, max_age=config.USERS_CACHE_TTL)
     wanted = (username or "").casefold()
     for user in doc.get("users", []):
         if user["username"].casefold() == wanted:
@@ -512,7 +517,7 @@ def get_user_by_username(username: str) -> dict | None:
     return None
 
 
-def create_user(username: str, password_hash: str) -> dict:
+def create_user(username: str, password_hash: str, permissions: dict | None = None) -> dict:
     """Solleva ValueError se lo username è già in uso. Il controllo avviene
     dentro la stessa scrittura protetta da lock (nessuna finestra fra "esiste
     già?" e l'inserimento, almeno all'interno della stessa istanza)."""
@@ -524,10 +529,43 @@ def create_user(username: str, password_hash: str) -> dict:
         new_id = doc["next_id"]
         doc["next_id"] = new_id + 1
         row = {"id": new_id, "username": username, "password_hash": password_hash, "created_at": _now()}
+        if permissions is not None:
+            row["permissions"] = dict(permissions)
         doc["users"].append(row)
         return dict(row)
 
     return storage.update_json(USERS_DOC, _empty_users, _insert)
+
+
+def list_users() -> list[dict]:
+    """Elenco utenti registrati, SENZA password_hash (per il pannello admin).
+    Lettura fresca: l'admin deve vedere lo stato reale."""
+    doc = storage.read_json(USERS_DOC, _empty_users, fresh=True)
+    return [{k: v for k, v in u.items() if k != "password_hash"} for u in doc.get("users", [])]
+
+
+def set_user_permissions(user_id: int, permissions: dict) -> dict | None:
+    """Sostituisce i permessi dell'utente; None se l'id non esiste."""
+
+    def _apply(doc: dict):
+        for user in doc["users"]:
+            if user["id"] == user_id:
+                user["permissions"] = dict(permissions)
+                return {k: v for k, v in user.items() if k != "password_hash"}
+        raise storage.SkipWrite(None)
+
+    return storage.update_json(USERS_DOC, _empty_users, _apply)
+
+
+def delete_user(user_id: int) -> bool:
+    def _remove(doc: dict) -> bool:
+        before = len(doc["users"])
+        doc["users"] = [u for u in doc["users"] if u["id"] != user_id]
+        if len(doc["users"]) == before:
+            raise storage.SkipWrite(False)
+        return True
+
+    return storage.update_json(USERS_DOC, _empty_users, _remove)
 
 
 def movies_without_collection_info(after_id: int, limit: int) -> list[dict]:

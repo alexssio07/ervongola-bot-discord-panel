@@ -43,4 +43,4 @@ più uno store Blob privato. Passi completi, variabili d'ambiente e quota gratui
 ## Sicurezza
 
 Non committare mai `.env`, `api/.env` o `api/data/` (sono nel `.gitignore`): contengono `SECRET_KEY`,
-l'hash della password admin e i dati del pannello. In produzione su Vercel la registrazione è sempre chiusa (solo login); è aperta solo in preview e in locale.
+l'hash della password admin e i dati del pannello. La registrazione è aperta in ogni ambiente: chi si registra parte in **sola lettura** e l'admin (pagina «Utenti») assegna per ogni sezione (Film, Frasi, Audio) il livello Nessuno, Lettura o Scrittura. Gli utenti già presenti prima dei permessi mantengono l'accesso completo. `ALLOW_REGISTRATION=false` chiude la registrazione.

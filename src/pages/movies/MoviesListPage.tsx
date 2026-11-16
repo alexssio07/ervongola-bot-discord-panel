@@ -48,6 +48,7 @@ import {
 import ActivityLayout from "../../components/ActivityFeed";
 import BackupDialog from "../../components/BackupDialog";
 import ForumReportDialog from "../../components/ForumReportDialog";
+import { useAuth } from "../../context/AuthContext";
 import MovieStatsPanel from "../../components/MovieStats";
 import MovieDialog, { STATUS_META, formatWatchedDate } from "../../components/MovieDialog";
 import SearchField from "../../components/SearchField";
@@ -117,6 +118,9 @@ export default function MoviesListPage() {
   const [syncing, setSyncing] = useState(false);
   const [forumReport, setForumReport] = useState<ForumReport | null>(null);
   const [backupOpen, setBackupOpen] = useState(false);
+  // Solo l'interfaccia: i permessi veri sono controllati dal backend su ogni richiesta.
+  const { can } = useAuth();
+  const canWrite = can("movies", "write");
 
   useEffect(() => {
     const t = setTimeout(() => setSearch(searchInput.trim()), SEARCH_DEBOUNCE_MS);
@@ -350,21 +354,25 @@ export default function MoviesListPage() {
                       <span />
                     )}
                     <Box>
-                      <Tooltip title="Modifica">
-                        <IconButton size="small" component={RouterLink} to={`/movies/${movie.id}`}>
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Elimina">
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => handleDelete(movie)}
-                          disabled={deletingId === movie.id}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
+                      {canWrite && (
+                        <>
+                          <Tooltip title="Modifica">
+                            <IconButton size="small" component={RouterLink} to={`/movies/${movie.id}`}>
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Elimina">
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() => handleDelete(movie)}
+                              disabled={deletingId === movie.id}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </>
+                      )}
                     </Box>
                   </CardActions>
                 </Card>
@@ -389,22 +397,26 @@ export default function MoviesListPage() {
           FILM VISTI SU DISCORD
         </Typography>
         <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            component={RouterLink}
-            to="/movies/new"
-          >
-            Aggiungi film
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={grouping ? <CircularProgress size={20} /> : <LayersIcon />}
-            onClick={handleGroupSagas}
-            disabled={grouping || loading}
-          >
-            Raggruppa saghe e durate
-          </Button>
+          {canWrite && (
+            <>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                component={RouterLink}
+                to="/movies/new"
+              >
+                Aggiungi film
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={grouping ? <CircularProgress size={20} /> : <LayersIcon />}
+                onClick={handleGroupSagas}
+                disabled={grouping || loading}
+              >
+                Raggruppa saghe e durate
+              </Button>
+            </>
+          )}
           <Button
             variant="outlined"
             startIcon={syncing ? <CircularProgress size={20} /> : <SyncIcon />}

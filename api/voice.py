@@ -16,7 +16,7 @@ from flask import Blueprint, Response, jsonify, request
 
 import config
 import storage
-from auth import require_auth
+from auth import require_permission
 
 bp = Blueprint("voice", __name__, url_prefix="/api/voice")
 
@@ -79,13 +79,13 @@ def _call_bot(method: str, path: str, payload: dict | None = None, timeout: int 
 
 
 @bp.get("/audio")
-@require_auth
+@require_permission("audio", "read")
 def list_audio():
     return jsonify({"files": _list_audio()})
 
 
 @bp.get("/audio/file")
-@require_auth
+@require_permission("audio", "read")
 def audio_file():
     """Anteprima: manda al browser i byte di un audio (in streaming, quindi senza
     il limite di 4,5 MB delle risposte di una funzione Vercel)."""
@@ -109,7 +109,7 @@ def audio_file():
 
 
 @bp.get("/status")
-@require_auth
+@require_permission("audio", "read")
 def status():
     if not config.BOT_CONTROL_URL:
         # Il frontend smette di interrogare lo stato ogni pochi secondi.
@@ -126,7 +126,7 @@ def status():
 
 
 @bp.get("/channels")
-@require_auth
+@require_permission("audio", "read")
 def channels():
     if not config.BOT_CONTROL_URL:
         return jsonify({"channels": []})  # nessun bot collegato: elenco vuoto, non un errore
@@ -135,7 +135,7 @@ def channels():
 
 
 @bp.post("/connect")
-@require_auth
+@require_permission("audio", "write")
 def connect():
     payload = request.get_json(silent=True) or {}
     data, code = _call_bot("POST", "/connect", {"channel_id": str(payload.get("channel_id", ""))}, CONNECT_TIMEOUT)
@@ -143,14 +143,14 @@ def connect():
 
 
 @bp.post("/disconnect")
-@require_auth
+@require_permission("audio", "write")
 def disconnect():
     data, code = _call_bot("POST", "/disconnect", {}, CONNECT_TIMEOUT)
     return jsonify(data), code
 
 
 @bp.post("/play")
-@require_auth
+@require_permission("audio", "write")
 def play():
     payload = request.get_json(silent=True) or {}
     name = str(payload.get("file", ""))
@@ -162,14 +162,14 @@ def play():
 
 
 @bp.post("/stop")
-@require_auth
+@require_permission("audio", "write")
 def stop():
     data, code = _call_bot("POST", "/stop", {})
     return jsonify(data), code
 
 
 @bp.post("/tts")
-@require_auth
+@require_permission("audio", "read")  # solo anteprima: genera un mp3, non cambia lo stato del bot
 def tts_preview():
     """Anteprima audio di una frase (stessa voce del bot). Il bot genera l'mp3 e lo
     tiene in cache su disco: riascoltare la stessa frase e' istantaneo."""

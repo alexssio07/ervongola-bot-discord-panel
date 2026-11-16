@@ -7,7 +7,7 @@ from flask import Blueprint, Response, g, jsonify, request
 
 import activity
 import db
-from auth import require_auth
+from auth import require_permission
 
 bp = Blueprint("movies", __name__, url_prefix="/api/movies")
 
@@ -16,7 +16,7 @@ MAX_RESTORE_BYTES = 4 * 1024 * 1024  # sotto il limite di 4,5 MB del corpo di un
 
 
 @bp.get("")
-@require_auth
+@require_permission("movies", "read")
 def list_movies():
     status = request.args.get("status") or None
     platform = request.args.get("platform") or None
@@ -37,21 +37,21 @@ def list_movies():
 
 
 @bp.get("/filters")
-@require_auth
+@require_permission("movies", "read")
 def get_filters():
     """Generi e piattaforme presenti nel catalogo, per le select dei filtri."""
     return jsonify(db.get_filter_options())
 
 
 @bp.get("/stats")
-@require_auth
+@require_permission("movies", "read")
 def get_stats():
     """Totali visti / da guardare, anche per genere (sull'intero catalogo)."""
     return jsonify(db.get_stats())
 
 
 @bp.get("/duplicates")
-@require_auth
+@require_permission("movies", "read")
 def check_duplicates():
     """Film già presenti con lo stesso titolo (e anno compatibile): usato dal
     form per avvisare PRIMA di salvare."""
@@ -63,7 +63,7 @@ def check_duplicates():
 
 
 @bp.get("/backup")
-@require_auth
+@require_permission("movies", "read")
 def download_backup():
     """Scarica l'intero catalogo come file JSON (ripristinabile con POST /restore)."""
     body = json.dumps(db.export_backup(), ensure_ascii=False, indent=2)
@@ -76,7 +76,7 @@ def download_backup():
 
 
 @bp.post("/restore")
-@require_auth
+@require_permission("movies", "write")
 def restore_backup():
     """Importa un file di backup. Campo `file` (multipart) e `mode`: merge (predefinito,
     aggiunge i film mancanti e salta i doppioni) oppure replace (sostituisce il catalogo,
@@ -107,7 +107,7 @@ def restore_backup():
 
 
 @bp.get("/<int:movie_id>")
-@require_auth
+@require_permission("movies", "read")
 def get_movie(movie_id: int):
     movie = db.get_movie(movie_id)
     if movie is None:
@@ -116,7 +116,7 @@ def get_movie(movie_id: int):
 
 
 @bp.post("")
-@require_auth
+@require_permission("movies", "write")
 def create_movie():
     payload = request.get_json(silent=True) or {}
     missing = [f for f in REQUIRED_FIELDS if not payload.get(f, "").strip()]
@@ -150,7 +150,7 @@ def create_movie():
 
 
 @bp.put("/<int:movie_id>")
-@require_auth
+@require_permission("movies", "write")
 def update_movie(movie_id: int):
     payload = request.get_json(silent=True) or {}
     try:
@@ -165,7 +165,7 @@ def update_movie(movie_id: int):
 
 
 @bp.delete("/<int:movie_id>")
-@require_auth
+@require_permission("movies", "write")
 def delete_movie(movie_id: int):
     existing = db.get_movie(movie_id)
     deleted = db.delete_movie(movie_id)

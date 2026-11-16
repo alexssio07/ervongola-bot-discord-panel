@@ -22,6 +22,7 @@ import { Link as RouterLink } from "react-router-dom";
 import { getMovieProviders, type Movie, type MovieProviders, type MovieStatus, type WatchProvider } from "../api/movies";
 import { apiErrorMessage } from "../api/client";
 import { formatRuntime } from "./MovieStats";
+import { useAuth } from "../context/AuthContext";
 
 export const STATUS_META: Record<
   MovieStatus,
@@ -193,6 +194,7 @@ interface Props {
 
 /** Popup con tutti i dettagli del film, incluso chi l'ha aggiunto e chi l'ha proposto. */
 export default function MovieDialog({ movie, onClose }: Props) {
+  const { can } = useAuth();
   const meta = movie ? STATUS_META[movie.status] : null;
   const StatusIcon = meta?.icon;
   const genres = movie ? movie.genre.split(",").map((g) => g.trim()).filter(Boolean) : [];
@@ -291,14 +293,16 @@ export default function MovieDialog({ movie, onClose }: Props) {
               </Button>
             )}
             <Box sx={{ flexGrow: 1 }} />
-            <Button
-              variant="outlined"
-              startIcon={<EditIcon />}
-              component={RouterLink}
-              to={`/movies/${movie.id}`}
-            >
-              Modifica
-            </Button>
+            {can("movies", "write") && (
+              <Button
+                variant="outlined"
+                startIcon={<EditIcon />}
+                component={RouterLink}
+                to={`/movies/${movie.id}`}
+              >
+                Modifica
+              </Button>
+            )}
             <Button variant="contained" onClick={onClose}>
               Chiudi
             </Button>

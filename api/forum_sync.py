@@ -29,7 +29,7 @@ from flask import Blueprint, jsonify, request
 
 import config
 import db
-from auth import require_auth
+from auth import require_permission
 
 bp = Blueprint("forum_sync", __name__, url_prefix="/api/movies")
 logger = logging.getLogger("panel.movies")
@@ -238,7 +238,7 @@ def build_report(threads: list[dict], tags: dict[str, str], movies: list[dict]) 
 
 
 @bp.get("/forum-report")
-@require_auth
+@require_permission("movies", "read")
 def forum_report():
     if not config.DISCORD_TOKEN:
         return jsonify({"error": "DISCORD_TOKEN non disponibile nel pannello.", "code": "no_token"}), 503

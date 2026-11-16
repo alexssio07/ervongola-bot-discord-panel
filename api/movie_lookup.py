@@ -21,7 +21,7 @@ from flask import Blueprint, g, jsonify, request
 import activity
 import config
 import db
-from auth import require_auth
+from auth import require_permission
 
 bp = Blueprint("movie_lookup", __name__, url_prefix="/api/movies")
 logger = logging.getLogger("panel.movies")
@@ -120,7 +120,7 @@ def _search(title: str, language: str = LANGUAGE) -> list[dict]:
 
 
 @bp.get("/lookup")
-@require_auth
+@require_permission("movies", "read")
 def lookup_movie():
     title = (request.args.get("title") or "").strip()
     if len(title) < MIN_TITLE_LENGTH:
@@ -164,7 +164,7 @@ def _details(tmdb_id: int) -> dict:
 
 
 @bp.get("/lookup/details")
-@require_auth
+@require_permission("movies", "read")
 def lookup_details():
     try:
         tmdb_id = int(request.args.get("tmdb_id", ""))
@@ -229,7 +229,7 @@ def _providers(tmdb_id: int) -> dict:
 
 
 @bp.get("/<int:movie_id>/providers")
-@require_auth
+@require_permission("movies", "read")
 def movie_providers(movie_id: int):
     """Su quali piattaforme di streaming e' disponibile un film del catalogo."""
     movie = db.get_movie(movie_id)
@@ -294,7 +294,7 @@ def _find_match(title: str, year: str = "") -> tuple[dict | None, bool]:
 
 
 @bp.post("/backfill-collections")
-@require_auth
+@require_permission("movies", "write")
 def backfill_collections():
     """Rileva saga, anno di uscita e durata dei film già presenti nel catalogo.
 

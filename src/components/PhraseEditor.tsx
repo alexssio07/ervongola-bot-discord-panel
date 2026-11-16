@@ -28,6 +28,7 @@ import {
 } from "@mui/material";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiErrorMessage } from "../api/client";
+import { useAuth } from "../context/AuthContext";
 import {
   addPhrase,
   deletePhrase,
@@ -78,6 +79,9 @@ interface Props {
  * righe sotto le mani di chi sta scrivendo).
  */
 export default function PhraseEditor({ fileKey, liveEvent }: Props) {
+  // Solo l'interfaccia: il backend controlla comunque il permesso su ogni richiesta.
+  const { can } = useAuth();
+  const canWrite = can("phrases", "write");
   const preview = usePhrasePreview();
 
   /** Cosa dice davvero il bot: le frasi d'ingresso sono precedute dal nome dell'utente. */
@@ -281,46 +285,48 @@ export default function PhraseEditor({ fileKey, liveEvent }: Props) {
 
   return (
     <Box>
-      <Paper variant="outlined" sx={{ p: 2.5, mb: 3 }}>
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-          <TextField
-            placeholder={newPhrasePlaceholder(fileKey)}
-            value={newText}
-            onChange={(e) => setNewText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleAdd();
-            }}
-            fullWidth
-            size="small"
-            slotProps={{ htmlInput: { "aria-label": "Nuovo elemento" } }}
-          />
-          {previewButton("new", newText)}
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={handleAdd}
-            disabled={adding || !newText.trim() || hasExact}
-            color={similar.length > 0 && !hasExact ? "warning" : "primary"}
-            sx={{ whiteSpace: "nowrap" }}
-          >
-            {similar.length > 0 && !hasExact ? "Aggiungi comunque" : "Aggiungi"}
-          </Button>
-        </Stack>
-        {similar.length > 0 && (
-          <Alert severity={hasExact ? "error" : "warning"} sx={{ mt: 2 }}>
-            <Typography sx={{ fontWeight: 700 }}>
-              {hasExact ? "Questa frase esiste già:" : "Esistono già frasi molto simili a quella che stai scrivendo:"}
-            </Typography>
-            <Box component="ul" sx={{ m: 0, mt: 0.5, pl: 2.5 }}>
-              {similar.map((s) => (
-                <li key={s.index}>
-                  «{s.text}» <em>({Math.round(s.score * 100)}% simile)</em>
-                </li>
-              ))}
-            </Box>
-          </Alert>
-        )}
-      </Paper>
+      {canWrite && (
+        <Paper variant="outlined" sx={{ p: 2.5, mb: 3 }}>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+            <TextField
+              placeholder={newPhrasePlaceholder(fileKey)}
+              value={newText}
+              onChange={(e) => setNewText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleAdd();
+              }}
+              fullWidth
+              size="small"
+              slotProps={{ htmlInput: { "aria-label": "Nuovo elemento" } }}
+            />
+            {previewButton("new", newText)}
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={handleAdd}
+              disabled={adding || !newText.trim() || hasExact}
+              color={similar.length > 0 && !hasExact ? "warning" : "primary"}
+              sx={{ whiteSpace: "nowrap" }}
+            >
+              {similar.length > 0 && !hasExact ? "Aggiungi comunque" : "Aggiungi"}
+            </Button>
+          </Stack>
+          {similar.length > 0 && (
+            <Alert severity={hasExact ? "error" : "warning"} sx={{ mt: 2 }}>
+              <Typography sx={{ fontWeight: 700 }}>
+                {hasExact ? "Questa frase esiste già:" : "Esistono già frasi molto simili a quella che stai scrivendo:"}
+              </Typography>
+              <Box component="ul" sx={{ m: 0, mt: 0.5, pl: 2.5 }}>
+                {similar.map((s) => (
+                  <li key={s.index}>
+                    «{s.text}» <em>({Math.round(s.score * 100)}% simile)</em>
+                  </li>
+                ))}
+              </Box>
+            </Alert>
+          )}
+        </Paper>
+      )}
 
       <Box sx={{ mb: 3 }}>
         <SearchField
@@ -440,18 +446,22 @@ export default function PhraseEditor({ fileKey, liveEvent }: Props) {
                     ) : (
                       <>
                         {previewButton(`row-${item.index}`, item.text)}
-                        <IconButton size="small" onClick={() => startEdit(item)} aria-label="Modifica">
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => handleDelete(item)}
-                          disabled={deletingIndex === item.index}
-                          aria-label="Elimina"
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
+                        {canWrite && (
+                          <>
+                            <IconButton size="small" onClick={() => startEdit(item)} aria-label="Modifica">
+                              <EditIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() => handleDelete(item)}
+                              disabled={deletingIndex === item.index}
+                              aria-label="Elimina"
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </>
+                        )}
                       </>
                     )}
                   </TableCell>

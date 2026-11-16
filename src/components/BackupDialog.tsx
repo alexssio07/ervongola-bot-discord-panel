@@ -19,6 +19,7 @@ import {
 } from "@mui/material";
 import { useRef, useState } from "react";
 import { apiErrorMessage } from "../api/client";
+import { useAuth } from "../context/AuthContext";
 import {
   downloadMoviesBackup,
   restoreMoviesBackup,
@@ -35,6 +36,9 @@ interface Props {
 
 /** Scarica il catalogo come file e lo ripristina da file (unendo o sostituendo). */
 export default function BackupDialog({ open, onClose, onRestored }: Props) {
+  // Scaricare il backup e' una lettura; il ripristino modifica il catalogo e richiede la scrittura.
+  const { can } = useAuth();
+  const canRestore = can("movies", "write");
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [mode, setMode] = useState<RestoreMode>("merge");
@@ -123,71 +127,75 @@ export default function BackupDialog({ open, onClose, onRestored }: Props) {
             </Button>
           </Box>
 
-          <Divider />
+          {canRestore && (
+            <>
+              <Divider />
 
-          <Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700 }} gutterBottom>
-              Ripristina da file
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-              Scegli un file di backup (.json), anche prodotto dal vecchio pannello con lo script di conversione.
-            </Typography>
-            <input
-              ref={inputRef}
-              type="file"
-              accept=".json,application/json"
-              hidden
-              onChange={(e) => {
-                setFile(e.target.files?.[0] ?? null);
-                setResult(null);
-                setError(null);
-              }}
-            />
-            <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
-              <Button
-                variant="outlined"
-                startIcon={<UploadFileIcon />}
-                onClick={() => inputRef.current?.click()}
-                disabled={busy}
-              >
-                Scegli file
-              </Button>
-              <Typography variant="body2" color={file ? "text.primary" : "text.secondary"}>
-                {file ? `${file.name} (${Math.max(1, Math.round(file.size / 1024))} KB)` : "Nessun file scelto"}
-              </Typography>
-            </Stack>
+              <Box>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700 }} gutterBottom>
+                  Ripristina da file
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                  Scegli un file di backup (.json), anche prodotto dal vecchio pannello con lo script di conversione.
+                </Typography>
+                <input
+                  ref={inputRef}
+                  type="file"
+                  accept=".json,application/json"
+                  hidden
+                  onChange={(e) => {
+                    setFile(e.target.files?.[0] ?? null);
+                    setResult(null);
+                    setError(null);
+                  }}
+                />
+                <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
+                  <Button
+                    variant="outlined"
+                    startIcon={<UploadFileIcon />}
+                    onClick={() => inputRef.current?.click()}
+                    disabled={busy}
+                  >
+                    Scegli file
+                  </Button>
+                  <Typography variant="body2" color={file ? "text.primary" : "text.secondary"}>
+                    {file ? `${file.name} (${Math.max(1, Math.round(file.size / 1024))} KB)` : "Nessun file scelto"}
+                  </Typography>
+                </Stack>
 
-            <RadioGroup value={mode} onChange={(e) => setMode(e.target.value as RestoreMode)} sx={{ mt: 1.5 }}>
-              <FormControlLabel
-                value="merge"
-                control={<Radio size="small" />}
-                disabled={busy}
-                label="Aggiungi i film mancanti (consigliato): quelli già presenti vengono saltati"
-              />
-              <FormControlLabel
-                value="replace"
-                control={<Radio size="small" />}
-                disabled={busy}
-                label="Sostituisci tutto il catalogo con il contenuto del file"
-              />
-            </RadioGroup>
-            {mode === "replace" && (
-              <Alert severity="warning" sx={{ mt: 1 }}>
-                I film attuali che non sono nel file verranno rimossi. Prima di sostituire, il pannello salva una copia
-                del catalogo attuale.
-              </Alert>
-            )}
+                <RadioGroup value={mode} onChange={(e) => setMode(e.target.value as RestoreMode)} sx={{ mt: 1.5 }}>
+                  <FormControlLabel
+                    value="merge"
+                    control={<Radio size="small" />}
+                    disabled={busy}
+                    label="Aggiungi i film mancanti (consigliato): quelli già presenti vengono saltati"
+                  />
+                  <FormControlLabel
+                    value="replace"
+                    control={<Radio size="small" />}
+                    disabled={busy}
+                    label="Sostituisci tutto il catalogo con il contenuto del file"
+                  />
+                </RadioGroup>
+                {mode === "replace" && (
+                  <Alert severity="warning" sx={{ mt: 1 }}>
+                    I film attuali che non sono nel file verranno rimossi. Prima di sostituire, il pannello salva una copia
+                    del catalogo attuale.
+                  </Alert>
+                )}
 
-            <Button
-              variant="contained"
-              sx={{ mt: 2 }}
-              startIcon={restoring ? <CircularProgress size={20} color="inherit" /> : <UploadFileIcon />}
-              onClick={handleRestore}
-              disabled={!file || busy}
-            >
-              Ripristina
-            </Button>
-          </Box>
+                <Button
+                  variant="contained"
+                  sx={{ mt: 2 }}
+                  startIcon={restoring ? <CircularProgress size={20} color="inherit" /> : <UploadFileIcon />}
+                  onClick={handleRestore}
+                  disabled={!file || busy}
+                >
+                  Ripristina
+                </Button>
+              </Box>
+            </>
+          )}
 
           {error && (
             <Alert severity="error" onClose={() => setError(null)}>

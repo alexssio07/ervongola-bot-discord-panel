@@ -8,6 +8,7 @@ from flask_cors import CORS
 import config
 import db
 from activity import bp as activity_bp
+from admin_routes import bp as admin_bp
 from auth_routes import bp as auth_bp
 from forum_sync import bp as forum_sync_bp
 from frontend import bp as frontend_bp
@@ -36,6 +37,7 @@ if config.CORS_ALLOWED_ORIGIN_REGEX:
 CORS(app, origins=_cors_origins, supports_credentials=True)
 
 app.register_blueprint(auth_bp)
+app.register_blueprint(admin_bp)
 app.register_blueprint(movies_bp)
 app.register_blueprint(movie_lookup_bp)
 app.register_blueprint(forum_sync_bp)
@@ -71,11 +73,10 @@ def _startup_checks() -> None:
         logger.warning("SECRET_KEY è ancora al valore di default: impostala prima di esporre il pannello.")
     if config.ON_VERCEL and config.ALLOW_REGISTRATION:
         logger.warning(
-            "Registrazione aperta a chiunque in questo deploy (%s): in produzione e' sempre chiusa; "
-            "ALLOW_REGISTRATION=false la chiude anche qui.",
-            config.VERCEL_ENV or "ambiente non production",
+            "Registrazione aperta a chiunque (%s): i nuovi utenti partono in sola lettura finche' "
+            "l'admin non assegna i permessi. ALLOW_REGISTRATION=false la chiude.",
+            config.VERCEL_ENV or "ambiente sconosciuto",
         )
-
 
 _startup_checks()
 

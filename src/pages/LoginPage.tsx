@@ -24,20 +24,15 @@ export default function LoginPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  // Il backend dice se la registrazione e' consentita (in produzione no): finche' non
-  // risponde il pulsante resta nascosto, cosi' non compare nemmeno per un attimo.
-  const [registrationOpen, setRegistrationOpen] = useState(false);
   const [backendProblem, setBackendProblem] = useState<string | null>(null);
 
+  // Il pulsante "Registrati" e' sempre visibile. Questa chiamata serve solo a segnalare
+  // un backend non raggiungibile o un VITE_API_URL sbagliato, invece di un errore generico al submit.
   useEffect(() => {
     let cancelled = false;
     apiClient
-      .get<{ registration_enabled: boolean }>("/api/auth/config")
-      .then((res) => {
-        if (!cancelled) setRegistrationOpen(res.data.registration_enabled === true);
-      })
+      .get("/api/auth/config")
       .catch((err) => {
-        // Backend non raggiungibile o indirizzo sbagliato: resta solo il login, ma lo diciamo.
         if (!cancelled) {
           setBackendProblem(
             err?.response
@@ -181,33 +176,29 @@ export default function LoginPage() {
           >
             {submitting && !isRegister ? "Accesso in corso..." : "Accedi"}
           </Button>
-          {registrationOpen && (
-            <Button
-              type={isRegister ? "submit" : "button"}
-              variant="contained"
-              color="secondary"
-              fullWidth
-              size="large"
-              disabled={submitting}
-              onClick={isRegister ? undefined : () => switchMode("register")}
-              sx={{ fontWeight: 700 }}
-            >
-              {submitting && isRegister ? "Registrazione in corso..." : "Registrati"}
-            </Button>
-          )}
+          <Button
+            type={isRegister ? "submit" : "button"}
+            variant="contained"
+            color="secondary"
+            fullWidth
+            size="large"
+            disabled={submitting}
+            onClick={isRegister ? undefined : () => switchMode("register")}
+            sx={{ fontWeight: 700 }}
+          >
+            {submitting && isRegister ? "Registrazione in corso..." : "Registrati"}
+          </Button>
         </Stack>
         {backendProblem && (
           <Alert severity="warning" sx={{ mt: 2 }}>
             {backendProblem}
           </Alert>
         )}
-        {registrationOpen && (
-          <Typography variant="body1" color="text.secondary" align="center" sx={{ mt: 2 }}>
-            {isRegister
-              ? "Compila i campi e premi Registrati per creare l'account."
-              : "Non hai un account? Premi Registrati."}
-          </Typography>
-        )}
+        <Typography variant="body1" color="text.secondary" align="center" sx={{ mt: 2 }}>
+          {isRegister
+            ? "Compila i campi e premi Registrati. Il nuovo account è in sola lettura finché l'amministratore non ti abilita."
+            : "Non hai un account? Premi Registrati."}
+        </Typography>
       </Paper>
     </Box>
   );

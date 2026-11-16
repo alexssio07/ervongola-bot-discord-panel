@@ -54,11 +54,11 @@ ADMIN_PASSWORD_HASH = os.getenv("ADMIN_PASSWORD_HASH", "")
 VERCEL_ENV = os.getenv("VERCEL_ENV", "").strip().lower()
 IS_PRODUCTION = VERCEL_ENV == "production"
 
-# Registrazione di nuovi utenti dal form di login: in PRODUZIONE su Vercel e' sempre
-# chiusa (solo login, con l'admin delle variabili d'ambiente), qualunque sia
-# ALLOW_REGISTRATION; in preview, in sviluppo e in locale resta aperta per le prove
-# (ALLOW_REGISTRATION=false la chiude anche li').
-ALLOW_REGISTRATION = (not IS_PRODUCTION) and _flag("ALLOW_REGISTRATION", True)
+# Registrazione di nuovi utenti dal form di login: aperta in ogni ambiente (anche in
+# produzione). Un utente appena registrato parte in SOLA LETTURA (vedi auth.py,
+# DEFAULT_NEW_USER_PERMISSIONS) finche' l'admin non gli assegna altri permessi.
+# ALLOW_REGISTRATION=false e' l'interruttore d'emergenza che la chiude.
+ALLOW_REGISTRATION = _flag("ALLOW_REGISTRATION", True)
 
 # --- Token di sessione (itsdangerous, incluso in Flask) ---
 SECRET_KEY = os.getenv("SECRET_KEY", "CHANGE-ME-please-set-a-real-secret-in-.env")
