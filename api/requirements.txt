@@ -3,6 +3,9 @@ flask-cors
 python-dotenv
 requests
 
+# Anteprima vocale delle frasi (Google Text-to-Speech, come il bot).
+gTTS>=2.5.0
+
 # Archivio dati su Vercel Blob (usato solo con STORAGE_BACKEND=blob, cioe' su Vercel).
 vercel-blob>=0.5.0
 

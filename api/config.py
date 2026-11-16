@@ -93,6 +93,12 @@ MOVIES_FORUM_CHANNEL_ID = os.getenv("MOVIES_FORUM_CHANNEL_ID", "1309263537390223
 BOT_CONTROL_URL = os.getenv("BOT_CONTROL_URL", "" if ON_VERCEL else "http://127.0.0.1:8081").strip().rstrip("/")
 BOT_CONTROL_TOKEN = os.getenv("BOT_CONTROL_TOKEN", "").strip()
 
+# --- Anteprima vocale delle frasi (Google TTS, come il bot) ---
+# Generata direttamente dal pannello con gTTS: non serve il bot acceso ne' BOT_CONTROL_URL.
+# Stessi valori del bot (tts_manager.py): italiano, dominio google.it.
+TTS_LANG = os.getenv("TTS_LANG", "it").strip() or "it"
+TTS_TLD = os.getenv("TTS_TLD", "it").strip() or "it"
+
 # --- Sincronizzazione verso il bot (frasi e audio) ---
 # Segreto macchina-macchina usato da tools/bot_sync.py (eseguito dove gira il bot).
 # Vuoto = endpoint /api/sync disattivati.

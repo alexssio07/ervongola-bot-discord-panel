@@ -3,13 +3,18 @@ Pagina "Audio" del pannello: elenco degli mp3 salvati nello archivio (cartella
 audio/, vedi storage.py), ascolto in anteprima nel browser e - se configurato -
 controllo del bot nel canale vocale (connetti / riproduci / ferma / disconnetti).
 
-Elenco e anteprima funzionano sempre, anche col bot spento. Le azioni vocali sono
+Elenco e anteprima funzionano sempre, anche col bot spento (l'anteprima delle frasi
+e' generata dal pannello stesso con Google TTS). Le azioni vocali sono
 inoltrate al server di controllo del bot (panel_control.py), che e' l'unico a
 parlare con Discord: da Vercel servono BOT_CONTROL_URL (URL pubblico HTTPS di quel
 server) e BOT_CONTROL_TOKEN; senza, rispondono "non disponibile" senza errori.
 """
 
+import io
+import logging
 import os
+import threading
+from collections import OrderedDict
 
 import requests
 from flask import Blueprint, Response, jsonify, request
@@ -19,6 +24,7 @@ import storage
 from auth import require_permission
 
 bp = Blueprint("voice", __name__, url_prefix="/api/voice")
+logger = logging.getLogger("panel.voice")
 
 AUDIO_PREFIX = "audio/"
 AUDIO_EXTENSIONS = (".mp3", ".wav")
@@ -168,36 +174,60 @@ def stop():
     return jsonify(data), code
 
 
+# Anteprima delle frasi: audio generato con Google TTS (gTTS), la stessa voce del bot.
+# Cache in memoria (LRU) per istanza: riascoltare la stessa frase non richiama Google.
+TTS_MAX_CHARS = 500
+TTS_TIMEOUT = 15
+_TTS_CACHE_MAX = 64
+_tts_cache: "OrderedDict[str, bytes]" = OrderedDict()
+_tts_cache_lock = threading.Lock()
+
+
+def _synthesize(text: str) -> bytes:
+    """Genera l'mp3 con gTTS. Solleva RuntimeError con un messaggio mostrabile."""
+    with _tts_cache_lock:
+        cached = _tts_cache.get(text)
+        if cached is not None:
+            _tts_cache.move_to_end(text)
+            return cached
+    try:
+        from gtts import gTTS, gTTSError
+    except ImportError as e:  # dipendenza non installata nel deploy
+        raise RuntimeError("Google TTS non disponibile: aggiungi gTTS a api/requirements.txt e rifai il deploy.") from e
+    try:
+        buffer = io.BytesIO()
+        gTTS(text=text, lang=config.TTS_LANG, tld=config.TTS_TLD, slow=False, lang_check=False, timeout=TTS_TIMEOUT).write_to_fp(buffer)
+    except gTTSError as e:
+        logger.warning("gTTS fallito: %s", e)
+        raise RuntimeError("Google TTS non ha risposto. Riprova tra poco.") from e
+    except requests.RequestException as e:
+        logger.warning("gTTS: errore di rete: %s", e)
+        raise RuntimeError("Google TTS non raggiungibile. Riprova tra poco.") from e
+    audio = buffer.getvalue()
+    if not audio:
+        raise RuntimeError("Google TTS ha restituito un audio vuoto.")
+    with _tts_cache_lock:
+        _tts_cache[text] = audio
+        while len(_tts_cache) > _TTS_CACHE_MAX:
+            _tts_cache.popitem(last=False)
+    return audio
+
+
 @bp.post("/tts")
 @require_permission("audio", "read")  # solo anteprima: genera un mp3, non cambia lo stato del bot
 def tts_preview():
-    """Anteprima audio di una frase (stessa voce del bot). Il bot genera l'mp3 e lo
-    tiene in cache su disco: riascoltare la stessa frase e' istantaneo."""
+    """Anteprima audio di una frase con Google TTS (stessa voce del bot, italiano)."""
     payload = request.get_json(silent=True) or {}
-    text = str(payload.get("text", "")).strip()
+    text = " ".join(str(payload.get("text", "")).split())
     if not text:
         return jsonify({"error": "Testo mancante."}), 400
-    if not config.BOT_CONTROL_URL:
-        return jsonify({"error": NOT_CONFIGURED, "code": "not_configured"}), 503
+    if len(text) > TTS_MAX_CHARS:
+        return jsonify({"error": f"Testo troppo lungo per l'anteprima (massimo {TTS_MAX_CHARS} caratteri)."}), 400
     try:
-        res = requests.post(
-            f"{config.BOT_CONTROL_URL}/tts",
-            json={"text": text},
-            headers=_control_headers(),
-            timeout=30,
-        )
-    except requests.ConnectionError:
-        return jsonify({"error": "Il bot non risponde (spento o ancora in avvio)."}), 503
-    except requests.Timeout:
-        return jsonify({"error": "La generazione dell'audio ha impiegato troppo."}), 504
+        audio = _synthesize(text)
+    except RuntimeError as e:
+        return jsonify({"error": str(e)}), 502
 
-    if res.status_code == 200:
-        out = Response(res.content, mimetype="audio/mpeg")
-        out.headers["Cache-Control"] = "private, max-age=3600"
-        return out
-    if res.status_code == 401:
-        return jsonify({"error": "Token di controllo non coincidente tra pannello e bot."}), 502
-    try:
-        return jsonify(res.json()), res.status_code
-    except ValueError:
-        return jsonify({"error": f"Risposta non valida dal bot (HTTP {res.status_code})."}), 502
+    out = Response(audio, mimetype="audio/mpeg")
+    out.headers["Cache-Control"] = "private, max-age=3600"
+    return out

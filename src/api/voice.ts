@@ -58,7 +58,7 @@ export async function stopAudio(): Promise<void> {
   await apiClient.post("/api/voice/stop");
 }
 
-/** Anteprima audio di una frase (mp3 generato dal bot, con cache lato server). */
+/** Anteprima audio di una frase (mp3 generato dal backend con Google TTS, con cache lato server). */
 export async function fetchPhraseAudio(text: string): Promise<Blob> {
   const res = await apiClient.post("/api/voice/tts", { text }, { responseType: "blob" });
   return res.data as Blob;
