@@ -32,6 +32,7 @@ import re
 import threading
 import unicodedata
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 
 import storage
 
@@ -275,3 +276,111 @@ def delete_phrase(file_key: str, index: int, expected: str | None = None) -> str
         removed = items.pop(index)
         _save_raw(spec, data)
         return _extract_text(spec, removed)
+
+
+# --- backup e ripristino ---
+BACKUP_FORMAT = "ervongola-phrases-backup"
+MAX_IMPORT_ITEMS = 10000  # per file
+_REPORT_LIMIT = 20
+
+
+def export_backup() -> dict:
+    """Tutti i file di frasi in un solo documento, con gli elementi cosi' come li
+    legge il bot (frasieffetto conserva anche il campo "users")."""
+    files = {}
+    for key, spec in FILE_REGISTRY.items():
+        files[key] = {"label": spec.label, "items": _load_raw(spec)[spec.list_key]}
+    return {
+        "format": BACKUP_FORMAT,
+        "version": 1,
+        "exported_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "files": files,
+    }
+
+
+def _clean_backup_item(spec: FileSpec, item):
+    """Elemento valido nello schema del file, oppure None. Un elemento non conforme
+    viene scartato (e segnalato), mai adattato a caso."""
+    if isinstance(item, dict):
+        text = item.get("text")
+    else:
+        text = item
+    if not isinstance(text, str) or not text.strip():
+        return None
+    text = text.strip()
+    if not spec.is_object:
+        return text
+    clean = dict(item) if isinstance(item, dict) else {}
+    clean["text"] = text
+    for name, default in spec.new_item_extra.items():
+        if not isinstance(clean.get(name), type(default)):
+            clean[name] = type(default)()
+    return clean
+
+
+def import_backup(document, mode: str) -> dict:
+    """Ripristina da un backup del pannello. `mode`: "merge" aggiunge le frasi mancanti
+    (doppioni ignorati, confronto senza maiuscole come in add_phrase); "replace"
+    sostituisce l'intera lista di ogni file presente nel backup, dopo aver salvato una
+    copia di sicurezza. I file non presenti nel backup restano intatti. Solleva
+    PhraseFileError con un messaggio mostrabile all'utente."""
+    if mode not in ("merge", "replace"):
+        raise PhraseFileError("Modalita' di ripristino non valida.")
+    if not isinstance(document, dict) or not isinstance(document.get("files"), dict):
+        raise PhraseFileError("Il file non e' un backup delle frasi del pannello.")
+    if document.get("format") not in (None, BACKUP_FORMAT):
+        raise PhraseFileError("Il file non e' un backup delle frasi del pannello.")
+
+    incoming = {}
+    for key, entry in document["files"].items():
+        if key not in FILE_REGISTRY:
+            raise PhraseFileError(f"File sconosciuto nel backup: {key}")
+        items = entry.get("items") if isinstance(entry, dict) else entry
+        if not isinstance(items, list):
+            raise PhraseFileError(f"Elenco frasi non valido per {key}.")
+        if len(items) > MAX_IMPORT_ITEMS:
+            raise PhraseFileError(f"Troppe frasi in {key} (massimo {MAX_IMPORT_ITEMS}).")
+        incoming[key] = items
+    if not incoming:
+        raise PhraseFileError("Il backup non contiene nessun file di frasi.")
+
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    results = {}
+    for key, raw_items in incoming.items():
+        spec = FILE_REGISTRY[key]
+        with _locks[key]:
+            data = _load_raw(spec, fresh=True)
+            existing = data[spec.list_key]
+            seen = {_extract_text(spec, i).lower() for i in existing} if mode == "merge" else set()
+            kept, invalid, duplicates = [], [], 0
+            for position, raw in enumerate(raw_items):
+                item = _clean_backup_item(spec, raw)
+                if item is None:
+                    invalid.append({"index": position, "error": "Testo mancante o non valido."})
+                    continue
+                folded = _extract_text(spec, item).lower()
+                if folded in seen:
+                    duplicates += 1
+                    continue
+                seen.add(folded)
+                kept.append(item)
+
+            safety_copy = ""
+            if mode == "replace":
+                safety_copy = f"json/backups/{spec.filename[:-5]}-{stamp}.json"
+                storage.write_json(safety_copy, data, indent=4)  # se fallisce, il file non viene toccato
+                data[spec.list_key] = kept
+            else:
+                existing.extend(kept)
+            _save_raw(spec, data)
+
+            results[key] = {
+                "label": spec.label,
+                "added": len(kept),
+                "duplicates": duplicates,
+                "invalid_count": len(invalid),
+                "invalid": invalid[:_REPORT_LIMIT],
+                "total": len(data[spec.list_key]),
+                "safety_copy": safety_copy,
+            }
+    return {"mode": mode, "files": results, "added": sum(r["added"] for r in results.values())}

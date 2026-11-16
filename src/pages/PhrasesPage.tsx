@@ -1,9 +1,11 @@
-import { Alert, Box, CircularProgress, Tab, Tabs, Typography } from "@mui/material";
+import BackupIcon from "@mui/icons-material/Backup";
+import { Alert, Box, Button, CircularProgress, Stack, Tab, Tabs, Typography } from "@mui/material";
 import { useCallback, useEffect, useState, type SyntheticEvent } from "react";
 import { apiErrorMessage } from "../api/client";
 import { listPhraseFiles, type PhraseFileInfo } from "../api/phrases";
 import ActivityLayout from "../components/ActivityFeed";
 import PhraseEditor from "../components/PhraseEditor";
+import PhrasesBackupDialog from "../components/PhrasesBackupDialog";
 import type { ActivityEvent } from "../hooks/useActivityStream";
 
 /** Fallback statico se il backend non risponde: evita una pagina vuota. */
@@ -18,6 +20,9 @@ export default function PhrasesPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeKey, setActiveKey] = useState<string>(FALLBACK_FILES[0].key);
   const [liveEvent, setLiveEvent] = useState<ActivityEvent | null>(null);
+  const [backupOpen, setBackupOpen] = useState(false);
+  // Cambia dopo un ripristino: forza il ricaricamento dell'editor con le frasi nuove.
+  const [reloadKey, setReloadKey] = useState(0);
 
   const handleLiveEvent = useCallback((event: ActivityEvent) => setLiveEvent(event), []);
 
@@ -39,9 +44,14 @@ export default function PhrasesPage() {
 
   return (
     <ActivityLayout onLiveEvent={handleLiveEvent}>
-      <Typography variant="h5" component="h1" gutterBottom>
-        Modifica frasi
-      </Typography>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={2}>
+        <Typography variant="h5" component="h1">
+          Modifica frasi
+        </Typography>
+        <Button variant="outlined" startIcon={<BackupIcon />} onClick={() => setBackupOpen(true)}>
+          Backup
+        </Button>
+      </Stack>
 
       {error && (
         <Alert severity="warning" sx={{ mb: 2 }}>
@@ -74,9 +84,15 @@ export default function PhrasesPage() {
           {/* key forza il remount dell'editor al cambio tab, così ogni file
               parte con la propria pagina/ricerca puliti invece di condividere
               lo stato del tab precedente. */}
-          <PhraseEditor key={activeKey} fileKey={activeKey} liveEvent={liveEvent} />
+          <PhraseEditor key={`${activeKey}-${reloadKey}`} fileKey={activeKey} liveEvent={liveEvent} />
         </>
       )}
+
+      <PhrasesBackupDialog
+        open={backupOpen}
+        onClose={() => setBackupOpen(false)}
+        onRestored={() => setReloadKey((k) => k + 1)}
+      />
     </ActivityLayout>
   );
 }
