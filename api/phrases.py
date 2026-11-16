@@ -35,7 +35,7 @@ def download_backup():
 @bp.post("/restore")
 @require_permission("phrases", "write")
 def restore_backup():
-    """Importa un backup. Campo `file` (multipart) e `mode`: merge (predefinito, aggiunge le
+    """Importa un backup del pannello o un file nativo del bot. Campo `file` (multipart) e `mode`: merge (predefinito, aggiunge le
     frasi mancanti e salta i doppioni) oppure replace (sostituisce le liste presenti nel
     backup, salvando prima una copia di sicurezza di ciascuna)."""
     upload = request.files.get("file")
@@ -51,6 +51,8 @@ def restore_backup():
 
     mode = request.form.get("mode") or "merge"
     try:
+        # Accetta il backup del pannello oppure un singolo file nativo del bot.
+        document = store.coerce_document(document, upload.filename or "")
         result = store.import_backup(document, mode)
     except store.PhraseFileError as e:
         return jsonify({"error": str(e)}), 400

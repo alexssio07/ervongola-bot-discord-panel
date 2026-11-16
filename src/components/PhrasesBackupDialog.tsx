@@ -138,7 +138,7 @@ export default function PhrasesBackupDialog({ open, onClose, onRestored }: Props
                   Ripristina da file
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                  Scegli un file di backup delle frasi (.json) scaricato da questo pannello.
+                  Scegli un backup scaricato da questo pannello, oppure un singolo file del bot (frasiaddio.json, frasieffetto.json o blasfemia.json): il file di destinazione si riconosce dal nome o dal contenuto.
                 </Typography>
                 <input
                   ref={inputRef}

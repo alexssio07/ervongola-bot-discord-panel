@@ -318,6 +318,43 @@ def _clean_backup_item(spec: FileSpec, item):
     return clean
 
 
+def coerce_document(document, filename: str = "") -> dict:
+    """Porta nel formato del backup anche un file NATIVO del bot (frasiaddio.json,
+    frasieffetto.json, blasfemia.json, oppure una lista nuda). Il file di destinazione
+    si riconosce dal nome del file, altrimenti dal contenuto: chiave "bestemmie" =
+    blasfemie; chiave "frasi" di sole stringhe = frasi d'addio, di oggetti = frasi
+    d'effetto. Un backup del pannello passa invariato."""
+    if isinstance(document, dict) and "files" in document:
+        return document
+
+    items, list_key = None, None
+    if isinstance(document, list):
+        items = document
+    elif isinstance(document, dict):
+        for key in ("frasi", "bestemmie"):
+            if isinstance(document.get(key), list):
+                items, list_key = document[key], key
+                break
+    if items is None:
+        return document  # import_backup lo rifiutera' con il messaggio standard
+
+    stem = filename.rsplit("/", 1)[-1].rsplit("\\", 1)[-1].lower()
+    target = next((k for k, spec in FILE_REGISTRY.items() if spec.filename.lower() == stem), None)
+    if target is None and stem.endswith(".json"):
+        target = next((k for k in FILE_REGISTRY if stem.startswith(k)), None)
+    if target is None:
+        if list_key == "bestemmie":
+            target = "blasfemia"
+        elif list_key == "frasi":
+            target = "frasieffetto" if any(isinstance(i, dict) for i in items) else "frasiaddio"
+    if target is None:
+        raise PhraseFileError(
+            "Non riesco a capire a quale file appartengono queste frasi: rinomina il file come "
+            "frasiaddio.json, frasieffetto.json o blasfemia.json."
+        )
+    return {"format": BACKUP_FORMAT, "files": {target: {"items": items}}}
+
+
 def import_backup(document, mode: str) -> dict:
     """Ripristina da un backup del pannello. `mode`: "merge" aggiunge le frasi mancanti
     (doppioni ignorati, confronto senza maiuscole come in add_phrase); "replace"
@@ -327,7 +364,7 @@ def import_backup(document, mode: str) -> dict:
     if mode not in ("merge", "replace"):
         raise PhraseFileError("Modalita' di ripristino non valida.")
     if not isinstance(document, dict) or not isinstance(document.get("files"), dict):
-        raise PhraseFileError("Il file non e' un backup delle frasi del pannello.")
+        raise PhraseFileError("Il file non e' un backup delle frasi (ne' un file frasiaddio/frasieffetto/blasfemia.json).")
     if document.get("format") not in (None, BACKUP_FORMAT):
         raise PhraseFileError("Il file non e' un backup delle frasi del pannello.")
 
