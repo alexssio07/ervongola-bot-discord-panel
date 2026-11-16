@@ -9,7 +9,7 @@ import {
 } from "@mui/material";
 import { useEffect, useState, type FormEvent } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { apiClient } from "../api/client";
+import { API_BASE_URL, apiClient, apiErrorMessage } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 
 type Mode = "login" | "register";
@@ -27,6 +27,7 @@ export default function LoginPage() {
   // Il backend dice se la registrazione e' consentita (in produzione no): finche' non
   // risponde il pulsante resta nascosto, cosi' non compare nemmeno per un attimo.
   const [registrationOpen, setRegistrationOpen] = useState(false);
+  const [backendProblem, setBackendProblem] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,8 +36,15 @@ export default function LoginPage() {
       .then((res) => {
         if (!cancelled) setRegistrationOpen(res.data.registration_enabled === true);
       })
-      .catch(() => {
-        // backend non raggiungibile: resta solo il login
+      .catch((err) => {
+        // Backend non raggiungibile o indirizzo sbagliato: resta solo il login, ma lo diciamo.
+        if (!cancelled) {
+          setBackendProblem(
+            err?.response
+              ? apiErrorMessage(err)
+              : `Backend non raggiungibile (indirizzo API: ${API_BASE_URL || "non impostato"}). Controlla VITE_API_URL e le impostazioni CORS del backend.`
+          );
+        }
       });
     return () => {
       cancelled = true;
@@ -188,6 +196,11 @@ export default function LoginPage() {
             </Button>
           )}
         </Stack>
+        {backendProblem && (
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            {backendProblem}
+          </Alert>
+        )}
         {registrationOpen && (
           <Typography variant="body1" color="text.secondary" align="center" sx={{ mt: 2 }}>
             {isRegister

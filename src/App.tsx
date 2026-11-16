@@ -20,7 +20,8 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import { Navigate, Route, BrowserRouter as Router, Routes, Link as RouterLink } from "react-router-dom";
+import { Navigate, Route, BrowserRouter as Router, Routes, Link as RouterLink, useLocation } from "react-router-dom";
+import ErrorBoundary from "./components/ErrorBoundary";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ThemeSettingsProvider, useThemeSettings } from "./context/ThemeSettingsContext";
@@ -112,44 +113,47 @@ function TopBar() {
 }
 
 function AppRoutes() {
+  const { pathname } = useLocation();
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route
-        path="/movies"
-        element={
-          <ProtectedRoute>
-            <MoviesListPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/movies/:id"
-        element={
-          <ProtectedRoute>
-            <MovieFormPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/phrases"
-        element={
-          <ProtectedRoute>
-            <PhrasesPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/audio"
-        element={
-          <ProtectedRoute>
-            <VoicePage />
-          </ProtectedRoute>
-        }
-      />
-      <Route path="/" element={<Navigate to="/movies" replace />} />
-      <Route path="*" element={<Navigate to="/movies" replace />} />
-    </Routes>
+    <ErrorBoundary resetKey={pathname}>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route
+          path="/movies"
+          element={
+            <ProtectedRoute>
+              <MoviesListPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/movies/:id"
+          element={
+            <ProtectedRoute>
+              <MovieFormPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/phrases"
+          element={
+            <ProtectedRoute>
+              <PhrasesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/audio"
+          element={
+            <ProtectedRoute>
+              <VoicePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/" element={<Navigate to="/movies" replace />} />
+        <Route path="*" element={<Navigate to="/movies" replace />} />
+      </Routes>
+    </ErrorBoundary>
   );
 }
 

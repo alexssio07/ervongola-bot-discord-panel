@@ -79,6 +79,9 @@ export async function listMovies(
   if (filters.sort && filters.sort !== "recenti") params.sort = filters.sort;
 
   const res = await apiClient.get<MoviePage>("/api/movies", { params });
+  if (!res.data || !Array.isArray(res.data.items)) {
+    throw new Error("Risposta dell'API non valida: elenco dei film mancante.");
+  }
   return res.data;
 }
 
