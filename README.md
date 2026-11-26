@@ -44,3 +44,6 @@ più uno store Blob privato. Passi completi, variabili d'ambiente e quota gratui
 
 Non committare mai `.env`, `api/.env` o `api/data/` (sono nel `.gitignore`): contengono `SECRET_KEY`,
 l'hash della password admin e i dati del pannello. La registrazione è aperta in ogni ambiente: chi si registra parte in **sola lettura** e l'admin (pagina «Utenti») assegna per ogni sezione (Film, Frasi, Audio) il livello Nessuno, Lettura o Scrittura. Gli utenti già presenti prima dei permessi mantengono l'accesso completo. `ALLOW_REGISTRATION=false` chiude la registrazione.
+
+<img width="2528" height="1272" alt="image" src="https://github.com/user-attachments/assets/c365293f-6640-403e-b45e-b0913dab846b" />
+<img width="2523" height="1266" alt="image" src="https://github.com/user-attachments/assets/50cfde17-edff-479e-8c9f-beae94699a34" />
